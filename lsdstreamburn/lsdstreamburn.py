@@ -157,7 +157,7 @@ def extract_network(DataDirectory, BurnedDEM, area_thresh=15000):
     else: 
         print("Good news, I found lsdtt-basic-metrics. Lets go!")
         
-
+    DEM_prefix = os.path.splitext(BurnedDEM)[0]
     gio.convert4lsdtt(DataDirectory,BurnedDEM)
 
     area_thresh_string = str(area_thresh)   
@@ -165,10 +165,11 @@ def extract_network(DataDirectory, BurnedDEM, area_thresh=15000):
 
     ## Get the basins
     lsdtt_parameters = {"remove_seas" : "true",
-                    "threshold_contributing_pixels" : area_thresh_string,
-                    "print_channels_to_csv" : "true"}
-    r_prefix = DataDirectory+"_"+BurnedDEM +"_UTM"
-    w_prefix = DataDirectory+"_"+BurnedDEM +"_UTM"
+                        "write_hillshade" : "true",
+                        "threshold_contributing_pixels" : area_thresh_string,
+                        "print_channels_to_csv" : "true"}
+    r_prefix = DataDirectory+DEM_prefix +"_UTM"
+    w_prefix = DataDirectory+DEM_prefix +"_UTM"
     
     print("The read prefix is: "+r_prefix)
     lsdtt_drive = lsdmw.lsdtt_driver(command_line_tool = "lsdtt-basic-metrics",
@@ -181,9 +182,21 @@ def extract_network(DataDirectory, BurnedDEM, area_thresh=15000):
     lsdtt_drive.run_lsdtt_command_line_tool()    
     
 
-def plot_network():
+def plot_network(DataDirectory, DEM_prefix):
     print("Not finished yet")
 
+    network_csv_name = DataDirectory+DEM_prefix+"_CN.csv"
+    
+    points_img = lsdmw.PrintPointsOverHillshade(DataDirectory,
+                                                DEM_prefix,cmap="gist_earth",
+                                                points_fname = network_csv_name,
+                                                size_format="geomorphology",dpi=600,
+                                                save_fig = True,
+                                                column_for_plotting = "stream_order",
+                                                column_for_scaling = "stream_order",
+                                                scaled_data_in_log = True,
+                                                max_point_size = 14, min_point_size =5)    
+    
 
 def burning_driver(DataDirectory = "./", 
                    location_year = 'Bolivia2020', 
