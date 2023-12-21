@@ -14,7 +14,7 @@ The "lsdstreamburn.py" file under "lsdstreamburn" directory contains code for se
 
 ### Prerequisites 🛠️
 
-1. **Register on Earth Engine Code Editor:** [Create an account](https://cThis space is dedicated to sharing insights into river network extraction. Consult our stream burning paper and refer to "stream_burning.ipynb" for detailed instructions and code. Explore, experiment, and adapt the code to suit your needs.ode.earthengine.google.com/) on Earth Engine Code Editor to get started.
+1. **Register on Earth Engine Code Editor:** [Create an account](https://code.earthengine.google.com/) on Earth Engine Code Editor to get started.
 
 2. **Obtain OpenTopography API Key:** Follow [this guide](https://opentopography.org/blog/introducing-api-keys-access-opentopography-global-datasets) to register an OpenTopography account and obtain an API key. This key is essential for customizing your DEM.
 
