@@ -7,8 +7,10 @@ import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 
-import lsdtopytools as lsd
+#import lsdtopytools as lsd
 import lsdviztools.lsdbasemaptools as bmt
+from lsdviztools.lsdplottingtools import lsdmap_gdalio as gio
+import lsdviztools.lsdmapwrappers as lsdmw
 
 def get_dem(OT_api_key_fname="my_OT_api_key.txt", source = "COP30",
             lower_left = [-16.88,-65.76],
@@ -57,11 +59,15 @@ def stream_burn(DataDirectory="./", DEM_prefix ="Bolivia", DEM_source = "COP30",
     print("Loading the class map")
     classmap_path = DataDirectory+location_year+"_example_ClassMap.tif"
     channel_mask = xr.open_dataarray(classmap_path)
-    
+
+       
     # Now load the DEM using xarray
     print("Loading the DEM")
-    dem_path = DEM_prefix+'.tif'
+    dem_path = DEM_prefix+"_"+DEM_source+'.tif'
     dem = xr.open_dataarray(dem_path)    
+   
+    # Reproject channel mask to match the CRS system of channel mask
+    channel_mask_reprojected = dem.rio.reproject_match(dem)     
     
     # Set the output directory
     out_path = './burned_dem'
@@ -73,9 +79,9 @@ def stream_burn(DataDirectory="./", DEM_prefix ="Bolivia", DEM_source = "COP30",
     out_full_fname = out_path
  
     # Create a new DEM using the water and sediment mask
-    dem1 = xr.where(water == 1, dem - depth1, dem)
+    dem1 = xr.where(channel_mask_reprojected == 1, dem - depth1, dem)
     if burn_sediment:
-        dem1 = xr.where(water == 2, dem1 - depth2, dem1)
+        dem1 = xr.where(channel_mask_reprojected == 2, dem1 - depth2, dem1)
         dem2 = dem1.rio.set_crs(dem.rio.crs)
         dem_utm = dem2.rio.reproject(dem2.rio.estimate_utm_crs()) # nodata type is default: positive inf
 
@@ -91,16 +97,8 @@ def stream_burn(DataDirectory="./", DEM_prefix ="Bolivia", DEM_source = "COP30",
     return [out_full_fname,dem_utm]
 
 
-def extract_network(DataDirectory, BurnedDEM, area_thresh=15000):
-    """Extracts network
-
-    Args:
-        ax_list (axes objects): the list of axis objects
-        axis_style (string): The syle of the axis. See options below.
-
-    Author: QC
-    """     
-    
+def extract_network_lsdtopytools(DataDirectory, BurnedDEM, area_thresh=15000):
+    """
     mydem = lsd.LSDDEM(path = DataDirectory, 
                        file_name = BurnedDEM, 
                        already_preprocessed = False) # remove_seas=True, sea_level = 0.01, can also set it to the minimum elevation of DEM
@@ -111,18 +109,6 @@ def extract_network(DataDirectory, BurnedDEM, area_thresh=15000):
     mydem.CommonFlowRoutines()
     mydem.ExtractRiverNetwork(method = "area_threshold", area_threshold_min = area_thresh)
 
-    catch_coord = mydem.DefineCatchment(method = "main_basin")
-    mydem.GenerateChi(theta = 0.35, A_0 = 1)
-
-    # Plot rivernetwork on DEM
-    fig, ax = lsd.quickplot.get_basemap(mydem , figsize = (15,15), cmap = "gist_earth", hillshade = True, 
-	alpha_hillshade = 1, cmin = None, cmax = None,
-	hillshade_cmin = 0, hillshade_cmax = 1, colorbar = False, 
-	fig = None, ax = None, colorbar_label = None, colorbar_ax = None, fontsize_ticks = 16, normalise_HS = True)
-    size_array = lsd.size_my_points(np.log10(mydem.df_base_river.drainage_area), 1, 5)
-
-    ax.scatter(mydem.df_base_river.x, mydem.df_base_river.y, lw=0, c= "b",  zorder = 2, s=size_array, alpha=0.8)
-    lsd.quickplot_utilities.add_basin_outlines(mydem, fig, ax, size_outline = 20, zorder = 5, color = "k")
 
     # Export river network
     network = mydem.df_base_river.set_index(['y','x']).to_xarray().set_coords(['x','y'])  #set_index() here will assign the dimensions for xarray dataset
@@ -146,10 +132,57 @@ def extract_network(DataDirectory, BurnedDEM, area_thresh=15000):
     drainage_area = network['drainage_area']
     print("Max_drainage_area:", drainage_area.max())
 
-    return network
+    return network    
+    """    
+    
+    
+
+def extract_network(DataDirectory, BurnedDEM, area_thresh=15000):
+    """Extracts network
+
+    Args:
+        ax_list (axes objects): the list of axis objects
+        axis_style (string): The syle of the axis. See options below.
+
+    Author: SMM
+    """     
+ 
+
+    # first figure out if lsdtopotools is available
+    from shutil import which
+
+    if (which("lsdtt-basic-metrics") is None):
+        print("I did not find lsdtt-basic-metrcs. You need to install that.")
+        exit(0)
+    else: 
+        print("Good news, I found lsdtt-basic-metrics. Lets go!")
+        
+
+    gio.convert4lsdtt(DataDirectory,BurnedDEM)
+
+    area_thresh_string = str(area_thresh)   
 
 
+    ## Get the basins
+    lsdtt_parameters = {"remove_seas" : "true",
+                    "threshold_contributing_pixels" : area_thresh_string,
+                    "print_channels_to_csv" : "true"}
+    r_prefix = DataDirectory+"_"+BurnedDEM +"_UTM"
+    w_prefix = DataDirectory+"_"+BurnedDEM +"_UTM"
+    
+    print("The read prefix is: "+r_prefix)
+    lsdtt_drive = lsdmw.lsdtt_driver(command_line_tool = "lsdtt-basic-metrics",
+                                 read_prefix = r_prefix,
+                                 write_prefix= w_prefix,
+                                 read_path = "./",
+                                 write_path = "./",
+                                 parameter_dictionary=lsdtt_parameters)
+    lsdtt_drive.print_parameters()
+    lsdtt_drive.run_lsdtt_command_line_tool()    
+    
 
+def plot_network():
+    print("Not finished yet")
 
 
 def burning_driver(DataDirectory = "./", 
