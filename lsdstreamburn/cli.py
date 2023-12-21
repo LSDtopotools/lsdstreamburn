@@ -22,14 +22,7 @@ import lsdstreamburn as sb
 def print_welcome():
 
     print("\n\n=======================================================================")
-    print("Hello! I'm going to grab some data from opentopography.")
-    print("You will need to tell me which directory to look in.")
-    print("Use the -dir flag to define the working directory.")
-    print("If you don't do this I will assume the data is in the same directory as this script.")
-    print("You also need to tell me the prefix of the DEM you want to download")
-    print("Use the -fname flag to designate a file prefix")
-    print("For help type:")
-    print("   lsdtt_grabopentopographydata -h\n")
+    print("Hello! I'm going to burn some streams for you.")
     print("=======================================================================\n\n ")
    
     

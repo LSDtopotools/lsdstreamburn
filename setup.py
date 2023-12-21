@@ -10,7 +10,7 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['lsdtopytools','xarray','lsdviztools>=0.4.9']
+requirements = ['lsdtopytools','xarray','lsdviztools>=0.4.11']
 
 setup_requirements = ['pytest-runner', ]
 
