@@ -24,11 +24,12 @@ Prerequisites
 3. **Python Environment Setup:** In a Python3 environment, make sure to install the following packages:
     - `numpy`
     - `xarray`
+    - `rioxarray`
     - `matplotlib`
 
    You can install them using the following command:
 
-   pip install numpy xarray matplotlib
+   pip install numpy xarray rioxarray matplotlib
 
 4. **LSDTopoTools & LSDVizTools Installation:**  In the same Python environment, install 'LSDTopoTools2' and 'lsdviztools' from their [GitHub repository](https://github.com/LSDtopotools) using the following commands:
 
@@ -47,11 +48,9 @@ Let's Get Rolling!
 3. **Denoise Land Cover Map:** This step will help you to denoise the land cover classification map from last step. Open the script "GEE_post_classification.js" and copy everything. Open another new file in the Earth Engine code editor, paste all the codes in. Run it and download the exported clustered map.
 Make sure your land cover classification map of a river basin is ready. If not, we prepare you an example here called "Bolivia2020_example_ClassMap.tif" that can be downloaded from [a Dropbox storage](https://www.dropbox.com/scl/fi/cqshbenb7xjp62c1h4u6o/Bolivia2020_example_ClassMap.tif?rlkey=m9jejwt4qaqdqpjgv3wtd906d&dl=0).
 
-4. **Stream burn in a Jupyter Notebook:** TODO 
+4. **Stream burn in a Jupyter Notebook:** Open "stream_burn_example.ipynb". Follow the notebook's guidance to run cells.
 
-5. **Stream burn in a Jupyter Notebook:** Open "stream_burn_example.ipynb" and run the cells. Follow the notebook's guidance to run cells.
-
-6. **Check the Result** Download a Sentinel-2 Red-Green-Blue image from the same area of interest, and overlay the extracted river network on the Sentinel-2 image to check the alignment.
+5.. **Check the Result** Download a Sentinel-2 Red-Green-Blue image from the same area of interest, and overlay the extracted river network on the Sentinel-2 image to check the alignment.
 
 Downloading DEM
 ---------------
