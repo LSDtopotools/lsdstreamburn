@@ -3,6 +3,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import rioxarray as rx
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,6 +13,7 @@ import lsdviztools.lsdbasemaptools as bmt
 from lsdviztools.lsdplottingtools import lsdmap_gdalio as gio
 import lsdviztools.lsdmapwrappers as lsdmw
 
+    
 def get_dem(OT_api_key_fname="my_OT_api_key.txt", source = "COP30",
             lower_left = [-16.88,-65.76],
             upper_right = [-16.50,-65.37],
@@ -40,7 +42,10 @@ def get_dem(OT_api_key_fname="my_OT_api_key.txt", source = "COP30",
     fullfname,DataDirectory,BurnedDEM = test_DEM.download_pythonic() 
     return fullfname
 
-def stream_burn(DataDirectory="./", DEM_prefix ="Bolivia", DEM_source = "COP30", location_year = "Bolivia2020",  
+def stream_burn(location_year = "Bolivia2020", 
+                classmap_path="./Bolivia2020_example_ClassMap.tif", 
+                dem_path="./Bolivia_COP30.tif",
+                DEM_source='COP30', 
                 burn_sediment=True, depth1=40, depth2=5):
     """Burns streams
  
@@ -57,17 +62,14 @@ def stream_burn(DataDirectory="./", DEM_prefix ="Bolivia", DEM_source = "COP30",
 
     # First, load the class map using xarray 
     print("Loading the class map")
-    classmap_path = DataDirectory+location_year+"_example_ClassMap.tif"
     channel_mask = xr.open_dataarray(classmap_path)
-
        
     # Now load the DEM using xarray
     print("Loading the DEM")
-    dem_path = DEM_prefix+"_"+DEM_source+'.tif'
     dem = xr.open_dataarray(dem_path)    
    
-    # Reproject channel mask to match the CRS system of channel mask
-    channel_mask_reprojected = dem.rio.reproject_match(dem)     
+    # Reproject dem to match the CRS system of channel mask
+    dem_reprojected = dem.rio.reproject_match(channel_mask)     
     
     # Set the output directory
     out_path = './burned_dem'
@@ -79,22 +81,22 @@ def stream_burn(DataDirectory="./", DEM_prefix ="Bolivia", DEM_source = "COP30",
     out_full_fname = out_path
  
     # Create a new DEM using the water and sediment mask
-    dem1 = xr.where(channel_mask_reprojected == 1, dem - depth1, dem)
+    dem1 = xr.where(channel_mask == 1, dem_reprojected - depth1, dem_reprojected)
     if burn_sediment:
-        dem1 = xr.where(channel_mask_reprojected == 2, dem1 - depth2, dem1)
-        dem2 = dem1.rio.set_crs(dem.rio.crs)
-        dem_utm = dem2.rio.reproject(dem2.rio.estimate_utm_crs()) # nodata type is default: positive inf
+        dem1 = xr.where(channel_mask == 2, dem1 - depth2, dem1)
+        dem2 = dem1.rio.set_crs(dem_reprojected.rio.crs)
+        # dem_utm = dem2.rio.reproject(dem2.rio.estimate_utm_crs()) # nodata type is default: positive inf
 
-        dem_utm.rio.to_raster(os.path.join(out_path, f'{location_year}_{DEM_source}_Burned{depth1}m{depth2}m_UTM.tif'))
-        out_full_fname = os.path.join(out_path, f'{location_year}_{DEM_source}_Burned{depth1}m{depth2}m_UTM.tif')
+        dem2.rio.to_raster(os.path.join(out_path, f'{location_year}_{DEM_source}_Burned{depth1}m{depth2}m.tif'))
+        out_full_fname = os.path.join(out_path, f'{location_year}_{DEM_source}_Burned{depth1}m{depth2}m.tif')
     else:
-        dem2 = dem1.rio.set_crs(dem.rio.crs)
-        dem_utm = dem2.rio.reproject(dem2.rio.estimate_utm_crs()) # nodata type is default: positive inf
+        dem2 = dem1.rio.set_crs(dem_reprojected.rio.crs)
+        # dem_utm = dem2.rio.reproject(dem2.rio.estimate_utm_crs()) # nodata type is default: positive inf
         
-        dem_utm.rio.to_raster(os.path.join(out_path, f'{location_year}_{DEM_source}_Burned{depth1}m_UTM.tif'))
-        out_full_fname = os.path.join(out_path, f'{location_year}_{DEM_source}_Burned{depth1}m_UTM.tif')
+        dem2.rio.to_raster(os.path.join(out_path, f'{location_year}_{DEM_source}_Burned{depth1}m.tif'))
+        out_full_fname = os.path.join(out_path, f'{location_year}_{DEM_source}_Burned{depth1}m.tif')
 
-    return [out_full_fname,dem_utm]
+    return out_full_fname, dem2
 
 
 def extract_network_lsdtopytools(DataDirectory, BurnedDEM, area_thresh=15000):
@@ -199,7 +201,11 @@ def plot_network(DataDirectory, DEM_prefix):
     
 
 def burning_driver(DataDirectory = "./", 
+                   dem_fname='Bolivia_COP30.tif', 
+                   channel_mask_fname='Bolivia2020_example_ClassMap.tif',
                    location_year = 'Bolivia2020', 
+                   burn_water_depth = 40,
+                   burn_sediment_depth=5,
                    area_thresh=15000):
     """Extracts network
 
@@ -210,25 +216,61 @@ def burning_driver(DataDirectory = "./",
     Author: QC
     """  
     
+    dem_path = os.path.join(DataDirectory, dem_fname)
+    channel_mask_path = os.path.join(DataDirectory, channel_mask_fname)
 
+    # dem = xr.open_dataarray(dem_fname)
+    # channel_mask = xr.open_dataarray(channel_mask_path)
     
-    # Reproject DEM to match the CRS system of channel mask using rasterio
-    dem_reprojected = dem.rio.reproject_match(channel_mask)
+ 
 
     # Burn water 20 meters and fluvial sediment 15 meters on the reprojected DEM
-    dem_burned = stream_burn(location_year, channel_mask, 'COP30', dem_reprojected, True, 20, 15)
+    dem_burned_fname, dem_burned = stream_burn(location_year, channel_mask_path, dem_path,'COP30', True, burn_water_depth, burn_sediment_depth)
     print("The minimum value of the burned DEM is: ", np.nanmin(dem_burned.data))
-
-    # Define a drainage area threshold for the river network
-    threshold_area = 15000
 
     # Located burned DEM
     burned_dem_path = './burned_dem/'
 
-    dem_list = [f for f in os.listdir(burned_dem_path) if f.endswith('.tif')]
+    dem_list = [os.path.join(burned_dem_path,f) for f in os.listdir(burned_dem_path) if f.endswith('.tif')]
+    dem_list.sort(key=os.path.getmtime)
+    chosen_dem =  dem_list[-1].split('/')[2]
     print("Available burned DEM: ", dem_list)
+    print('Chosen DEM to burn is: ', chosen_dem)
 
     # Extract the network
-    Extract_Network(burned_dem_path, dem_list[0], threshold_area)
+    extract_network(burned_dem_path, chosen_dem, area_thresh)
 
+    return dem_burned_fname
+
+
+
+if __name__ == "__main__":
+
+    # API_key_path = "/exports/csce/datastore/geos/users/s2135982/rivertools/test_lsdstreamburn/my_OT_api_key.txt"
+    # my_dem_path = get_dem(OT_api_key_fname=API_key_path, 
+    #                 source="COP30", 
+    #                 lower_left=[-16.88,-65.76],
+    #                 upper_right = [-16.50,-65.37],
+    #                 prefix = "Bolivia")
+
+    # print(my_dem_path)
+
+    WATER_DEPTH = 100
+    SEDI_DEPTH = 15
+
+    DEM_FNAME = 'Bolivia_COP30.tif'
+    CHANNEL_MASK_FNAME = 'Bolivia2020_example_ClassMap.tif'
+    LOCATION_YEAR = 'Bolivia2020'
+
+    # print(os.getcwd())
+    burned_dem_path = burning_driver(DataDirectory = "./", 
+                   dem_fname=DEM_FNAME, 
+                   channel_mask_fname=CHANNEL_MASK_FNAME,
+                   location_year = LOCATION_YEAR, 
+                   burn_water_depth=WATER_DEPTH,
+                   burn_sediment_depth=SEDI_DEPTH,
+                   area_thresh=15000)
     
+    burned_dem_prefix = burned_dem_path.split('/')[-1].split('.')[0] + '_UTM'
+
+    plot_network(DataDirectory="./burned_dem/", DEM_prefix=burned_dem_prefix)
