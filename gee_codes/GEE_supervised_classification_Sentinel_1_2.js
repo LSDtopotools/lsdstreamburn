@@ -101,24 +101,47 @@ Map.addLayer(AOI, {color: 'yellow'}, 'AOI');
 
 //------------------- Supervised classification ----------------//
 //Merge the training data collected from above section into one FeatureCollection
-var classNames = water.merge(sedi).merge(vege).merge(urban_agri);
+var samples = water.merge(sedi).merge(vege).merge(urban_agri);
+
+var sample_img = ee.Image().byte().paint(samples, "landcover").rename("landcover")
+
+// Then apply stratified sampling to this land cover sample image
+var stratifiedsample=sample_img.stratifiedSample({
+  numPoints: 1000, 
+  classBand: 'landcover',
+  scale: 30, 
+  projection: 'EPSG:4326',
+  region: AOI2,
+  geometries:true
+});
+
+print('Stratified samples', stratifiedsample); 
+print(stratifiedsample.reduceColumns(ee.Reducer.frequencyHistogram(),['landcover']).get('histogram','No of points')); 
+
+// Add a random value field to the sample and use it to approximately split 70%
+// of the features into a training set and 20% into a validation set.
+var all_sample = stratifiedsample.randomColumn();
+var trainSample = all_sample.filter('random <= 0.7');
+var validSample = all_sample.filter('random > 0.7');
+print(trainSample);
+print(validSample);
 
 var bands_s1 = ['VH','VV']; //'logVV/VH'
 var bands_s2 = ['NDWI','MNDWI','NDBI','NDVI'];
 var bands_s12 = ['VH','VV','NDWI','MNDWI','NDBI','NDVI'];
 
 var training_s1 = image_s1.select(bands_s1).sampleRegions({
-collection: classNames,
+collection: trainSample,
 properties: ['landcover'],
 scale: 30
 });
 var training_s2 = image_s2.select(bands_s2).sampleRegions({
-collection: classNames,
+collection: trainSample,
 properties: ['landcover'],
 scale: 30
 });
 var training_s12 = image_s12.select(bands_s12).sampleRegions({
-collection: classNames,
+collection: trainSample,
 properties: ['landcover'],
 scale: 30
 });
@@ -153,32 +176,20 @@ Map.addLayer(classified_s12,
 {min: 0, max: 3, palette:  ['green', 'blue', 'orange', 'grey']},'Sentinel-1&2 classification');
 
 // ----------------------------Validate the supervised classification--------------------//
-// This step requires a user add validating polygons on the map for 4 classes, 
-// they should not overlap with the training data.
-// Assign the 'landcover' property as follows:
-
-// Vvege: 0
-// Vwater: 1
-// Vsedi: 2
-// Vurban_agri: 3
-
-//Merge into one FeatureCollection
-var valNames = vVege.merge(vWater).merge(vSedi).merge(Vurban_agri);
-
 var validation_s1 = classified_s1.sampleRegions({
-collection: valNames,
+collection: validSample,
 properties: ['landcover'],
 scale: 30,
 });
 print('validation for Sentinel-1:', validation_s1);
 var validation_s2 = classified_s2.sampleRegions({
-collection: valNames,
+collection: validSample,
 properties: ['landcover'],
 scale: 30,
 });
 print('validation for Sentinel-2:', validation_s2);
 var validation_s12 = classified_s12.sampleRegions({
-collection: valNames,
+collection: validSample,
 properties: ['landcover'],
 scale: 30,
 });
