@@ -62,11 +62,11 @@ def stream_burn(location_year = "Bolivia2020",
 
     # First, load the class map using xarray 
     print("Loading the class map")
-    channel_mask = xr.open_dataarray(classmap_path)
+    channel_mask = rx.open_rasterio(classmap_path, masked=True).squeeze()
        
     # Now load the DEM using xarray
     print("Loading the DEM")
-    dem = xr.open_dataarray(dem_path)    
+    dem = rx.open_rasterio(dem_path, masked=True).squeeze()
    
     # Reproject dem to match the CRS system of channel mask
     dem_reprojected = dem.rio.reproject_match(channel_mask)     
@@ -84,13 +84,13 @@ def stream_burn(location_year = "Bolivia2020",
     dem1 = xr.where(channel_mask == 1, dem_reprojected - depth1, dem_reprojected)
     if burn_sediment:
         dem1 = xr.where(channel_mask == 2, dem1 - depth2, dem1)
-        dem2 = dem1.rio.set_crs(dem_reprojected.rio.crs)
+        dem2 = dem1.rio.write_crs(dem_reprojected.rio.crs)
         # dem_utm = dem2.rio.reproject(dem2.rio.estimate_utm_crs()) # nodata type is default: positive inf
 
         dem2.rio.to_raster(os.path.join(out_path, f'{location_year}_{DEM_source}_Burned{depth1}m{depth2}m.tif'))
         out_full_fname = os.path.join(out_path, f'{location_year}_{DEM_source}_Burned{depth1}m{depth2}m.tif')
     else:
-        dem2 = dem1.rio.set_crs(dem_reprojected.rio.crs)
+        dem2 = dem1.rio.write_crs(dem_reprojected.rio.crs)
         # dem_utm = dem2.rio.reproject(dem2.rio.estimate_utm_crs()) # nodata type is default: positive inf
         
         dem2.rio.to_raster(os.path.join(out_path, f'{location_year}_{DEM_source}_Burned{depth1}m.tif'))
@@ -139,7 +139,7 @@ def extract_network_lsdtopytools(DataDirectory, BurnedDEM, area_thresh=15000):
     
     
 
-def extract_network(DataDirectory, BurnedDEM, area_thresh=15000):
+def extract_network(DataDirectory, BurnedDEM, area_thresh=15000, res=30):
     """Extracts network
 
     Args:
@@ -160,7 +160,7 @@ def extract_network(DataDirectory, BurnedDEM, area_thresh=15000):
         print("Good news, I found lsdtt-basic-metrics. Lets go!")
         
     DEM_prefix = os.path.splitext(BurnedDEM)[0]
-    gio.convert4lsdtt(DataDirectory,BurnedDEM)
+    gio.convert4lsdtt(DataDirectory, BurnedDEM, resolution=res)
 
     area_thresh_string = str(area_thresh)   
 
@@ -206,7 +206,9 @@ def burning_driver(DataDirectory = "./",
                    location_year = 'Bolivia2020', 
                    burn_water_depth = 40,
                    burn_sediment_depth=5,
-                   area_thresh=15000):
+                   area_thresh=15000, 
+                   resolution=30,
+                   dem_source='COP30'):
     """Extracts network
 
     Args:
@@ -219,13 +221,15 @@ def burning_driver(DataDirectory = "./",
     dem_path = os.path.join(DataDirectory, dem_fname)
     channel_mask_path = os.path.join(DataDirectory, channel_mask_fname)
 
-    # dem = xr.open_dataarray(dem_fname)
-    # channel_mask = xr.open_dataarray(channel_mask_path)
-    
- 
-
     # Burn water 20 meters and fluvial sediment 15 meters on the reprojected DEM
-    dem_burned_fname, dem_burned = stream_burn(location_year, channel_mask_path, dem_path,'COP30', True, burn_water_depth, burn_sediment_depth)
+    burn_sediment=False
+    
+    if burn_sediment_depth is not None and burn_sediment_depth != 0:
+        burn_sediment = True
+    else:
+        burn_sediment = False
+        
+    dem_burned_fname, dem_burned = stream_burn(location_year, channel_mask_path, dem_path, dem_source, burn_sediment, burn_water_depth, burn_sediment_depth)
     print("The minimum value of the burned DEM is: ", np.nanmin(dem_burned.data))
 
     # Located burned DEM
@@ -238,7 +242,7 @@ def burning_driver(DataDirectory = "./",
     print('Chosen DEM to burn is: ', chosen_dem)
 
     # Extract the network
-    extract_network(burned_dem_path, chosen_dem, area_thresh)
+    extract_network(burned_dem_path, chosen_dem, area_thresh, res=resolution)
 
     return dem_burned_fname
 
