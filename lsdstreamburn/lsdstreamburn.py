@@ -139,7 +139,7 @@ def extract_network_lsdtopytools(DataDirectory, BurnedDEM, area_thresh=15000):
     
     
 
-def extract_network(DataDirectory, BurnedDEM, area_thresh=15000, res=30):
+def extract_network(DataDirectory, BurnedDEM, area_thresh=15000, res=30, lsdtt_parameters=None):
     """Extracts network
 
     Args:
@@ -164,12 +164,17 @@ def extract_network(DataDirectory, BurnedDEM, area_thresh=15000, res=30):
 
     area_thresh_string = str(area_thresh)   
 
-
-    ## Get the basins
-    lsdtt_parameters = {"remove_seas" : "true",
-                        "write_hillshade" : "true",
-                        "threshold_contributing_pixels" : area_thresh_string,
-                        "print_channels_to_csv" : "true"}
+    if not lsdtt_parameters:
+        lsdtt_parameters = {"remove_seas" : "true",
+                            "write_hillshade" : "true",
+                            "threshold_contributing_pixels" : area_thresh_string,
+                            "print_channels_to_csv" : "true", 
+                            "find_basins": "true",
+                            "maximum_basin_size_pixels": "100000000",
+                            "minimum_basin_size_pixels": "10000000",
+                            "only_take_largest_basin": "true",
+                            "print_chi_data_maps": "true"}
+    
     r_prefix = DataDirectory+DEM_prefix +"_UTM"
     w_prefix = DataDirectory+DEM_prefix +"_UTM"
     
@@ -187,7 +192,7 @@ def extract_network(DataDirectory, BurnedDEM, area_thresh=15000, res=30):
 def plot_network(DataDirectory, DEM_prefix):
     print("Not finished yet")
 
-    network_csv_name = DataDirectory+DEM_prefix+"_CN.csv"
+    network_csv_name = DataDirectory+DEM_prefix+"_chi_data_map.csv"
     
     points_img = lsdmw.PrintPointsOverHillshade(DataDirectory,
                                                 DEM_prefix,cmap="gist_earth",
@@ -208,7 +213,8 @@ def burning_driver(DataDirectory = "./",
                    burn_sediment_depth=5,
                    area_thresh=15000, 
                    resolution=30,
-                   dem_source='COP30'):
+                   dem_source='COP30', 
+                   lsdtt_parameters=None):
     """Extracts network
 
     Args:
@@ -231,6 +237,7 @@ def burning_driver(DataDirectory = "./",
         
     dem_burned_fname, dem_burned = stream_burn(location_year, channel_mask_path, dem_path, dem_source, burn_sediment, burn_water_depth, burn_sediment_depth)
     print("The minimum value of the burned DEM is: ", np.nanmin(dem_burned.data))
+    
 
     # Located burned DEM
     burned_dem_path = './burned_dem/'
@@ -242,7 +249,7 @@ def burning_driver(DataDirectory = "./",
     print('Chosen DEM to burn is: ', chosen_dem)
 
     # Extract the network
-    extract_network(burned_dem_path, chosen_dem, area_thresh, res=resolution)
+    extract_network(burned_dem_path, chosen_dem, area_thresh, res=resolution, lsdtt_parameters=lsdtt_parameters)
 
     return dem_burned_fname
 
